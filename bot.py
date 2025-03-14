@@ -8,4 +8,7 @@ def abc():
     print("ese")
 
 def efg():
-    print("hello")
+    print(".")
+
+def lmno():
+    print("aaa")
