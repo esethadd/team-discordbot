@@ -9,3 +9,6 @@ def abc():
 
 def efg():
     print("hello")
+
+def somethingNew():
+    print("ABC")
