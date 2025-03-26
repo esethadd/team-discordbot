@@ -11,6 +11,10 @@ async def on_ready():
     print(f"Logged in as {bot.user}")
 
 @bot.command()
+async def beginposting(ctx):
+    await ctx.send("The bot has received the '!beginposting' command and will start posting jobs.")
+
+@bot.command()
 async def jobs(ctx, category: str):
     response = requests.get(f"{API_URL}/jobs/{category}")
     if response.status_code == 200:
