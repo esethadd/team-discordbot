@@ -15,6 +15,18 @@ async def beginposting(ctx):
     await ctx.send("The bot has received the '!beginposting' command and will start posting jobs.")
 
 @bot.command()
+async def help(ctx):
+    await ctx.send("The bot has received the '!help' command and will display a help message.")
+
+@bot.command()
+async def stopposting(ctx):
+    await ctx.send("The bot has received the '!stopposting' command and will stop posting jobs.")
+
+@bot.command()
+async def changejobtype(ctx, category: str):
+    await ctx.send(f"The bot has received the '!changejobtype' command and will now post jobs in the {category} category.")
+
+@bot.command()
 async def jobs(ctx, category: str):
     response = requests.get(f"{API_URL}/jobs/{category}")
     if response.status_code == 200:
