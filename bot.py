@@ -45,4 +45,20 @@ async def jobs(ctx, category: str):
     else:
         await ctx.send("No jobs found in that category.")
 
+@bot.command()
+async def help():
+    help_text = """
+**Available Commands**:
+`!help` - shows this message
+`!company` <company_name> - searches for jobs from this company
+`!find` <keywords> <location> - finds specific jobs in a specific location
+`!latest` <industry> - the latest posting in an industry
+`!subscribe` <keywords> <location> - continually finds jobs for a particular position and shoots a DM about said job
+`!unsubscribe` <keywords> <location> - stops the subscription
+`!filter` <salary> <min_amnt> <max_amnt> - filters jobs by salary
+`!filter` <remote> <on/off> - filters for remote status
+`!stats` - displays all jobs found
+`!about` - about the bot and developer credits
+"""
+
 bot.run("YOUR_BOT_TOKEN")
