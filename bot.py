@@ -1,9 +1,13 @@
 import discord
 from discord.ext import commands
 from discord import Embed
+from collections import defaultdict, Counter
 
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
+
+# store user filters by user ID
+user_filters = {}
 
 API_URL = //insert API URL here
 
@@ -11,40 +15,133 @@ API_URL = //insert API URL here
 async def on_ready():
     print(f"Logged in as {bot.user}")
 
-@bot.command()
-async def beginposting(ctx):
-    await ctx.send("The bot has received the '!beginposting' command and will start posting jobs.")
+def reset_filters(user_id):
+    user_filters[user_id] = {
+        "salary": None,
+        "remote": None
+    }
+
+def get_filter_summary(user_id):
+    filters = user_filters.get(user_id, {})
+    salary = filters.get("salary")
+    remote = filters.get("remote")
+
+    summary = []
+    if salary:
+        summary.append(f"💰 Salary: ${salary[0]} - ${salary[1]}")
+    if remote is not None:
+        summary.append(f"🏠 Remote: {'On' if remote else 'Off'}")
+
+    return "\n".join(summary) if summary else "No filters applied."
 
 @bot.command()
-async def help(ctx):
-    await ctx.send("The bot has received the '!help' command and will display a help message.")
+async def filter(ctx):
+    user_id = ctx.author.id
+    if user_id not in user_filters:
+        reset_filters(user_id)
+
+    embed = Embed(
+        title="🧰 Job Filter Options",
+        description="Use these commands to narrow or reset your job search filters.",
+        color=0x3498db
+    )
+
+    embed.add_field(
+        name="💰 Salary Range Filter",
+        value=(
+            "`/filter_salary [min_amount] [max_amount]`\n"
+            "🔸 Example: `/filter_salary 30000 70000`\n"
+            "Shows jobs between $30,000 and $70,000."
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="🏠 Remote Work Filter",
+        value=(
+            "`/filter_remote [on/off]`\n"
+            "🔸 Example: `/filter_remote on`\n"
+            "Only includes remote-friendly jobs."
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="♻️ Reset Filters",
+        value=(
+            "`/filter_clear`\n"
+            "🔸 Resets all applied filters so future searches return full results."
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="📋 Current Filters",
+        value=get_filter_summary(user_id),
+        inline=False
+    )
+
+    embed.set_footer(text="Filters remain active until updated or cleared.")
+    await ctx.send(embed=embed)
 
 @bot.command()
-async def stopposting(ctx):
-    await ctx.send("The bot has received the '!stopposting' command and will stop posting jobs.")
+async def filter_remote(ctx, toggle: str):
+    user_id = ctx.author.id
+    if user_id not in user_filters:
+        reset_filters(user_id)
 
-@bot.command()
-async def changejobtype(ctx, category: str):
-    await ctx.send(f"The bot has received the '!changejobtype' command and will now post jobs in the {category} category.")
-
-@bot.command()
-async def jobs(ctx, category: str):
-    response = requests.get(f"{API_URL}/jobs/{category}")
-    if response.status_code == 200:
-        await ctx.send("Failed to fetch job listings. Try again later.")
+    if toggle.lower() not in ["on", "off"]:
+        await ctx.send("❌ Invalid input. Use `/filter remote on` or `/filter remote off`.")
         return
-    
-    jobs = response.json()[1:6]
-    job_results = []
 
-    for job in jobs:
-        if category.lower() in job.get("tags", []):
-            job_results.append(f"**{job['position']}** at {job['company']} - [Apply Here]({job['url']})")
+    user_filters[user_id]["remote"] = toggle.lower() == "on"
+    status = "enabled" if toggle.lower() == "on" else "disabled"
+    await ctx.send(f"🏠 Remote job filter {status}.")
 
-    if job_results:
-        await ctx.send("\n".join(job_results))
-    else:
-        await ctx.send("No jobs found in that category.")
+@bot.command()
+async def filter_clear(ctx):
+    user_id = ctx.author.id
+    reset_filters(user_id)
+    await ctx.send("♻️ All filters have been cleared.")
+
+bot_stats = {
+    "total_jobs_found": 0,
+    "keyword_counter": Counter(),
+    "industry_counter": Counter(),
+    "active_subscriptions": defaultdict(list)  # user_id -> list of keywords/locations
+}
+
+@bot.command()
+async def stats(ctx):
+    total = bot_stats["total_jobs_found"]
+    top_keywords = bot_stats["keyword_counter"].most_common(3)
+    top_industries = bot_stats["industry_counter"].most_common(3)
+    subs = len(bot_stats["active_subscriptions"])
+
+    embed = Embed(
+        title="📊 Job Search Stats",
+        description="Here's what the community has been looking for!",
+        color=0x4CAF50
+    )
+
+    embed.add_field(name="🧾 Total Jobs Found", value=str(total), inline=False)
+
+    embed.add_field(
+        name="🔍 Top Keywords",
+        value="\n".join(f"{kw} ({count})" for kw, count in top_keywords) or "None",
+        inline=False
+    )
+
+    embed.add_field(
+        name="🏭 Top Industries",
+        value="\n".join(f"{ind} ({count})" for ind, count in top_industries) or "None",
+        inline=False
+    )
+
+    embed.add_field(name="📬 Active Subscriptions", value=str(subs), inline=False)
+
+    await ctx.send(embed=embed)
+
 
 @bot.command()
 async def help_command(ctx, name="help"):
@@ -107,6 +204,7 @@ async def about(ctx):
         inline=False
     )
     embed.add_field(name="👨‍💻 Bot Creator", value="Lauren Rousell", inline=True)
+    embed.add_field(name="👨‍💻 Database Designer", value="Brenden Toussant", inline=True)
     embed.set_footer(text="Type /help to view available commands.")
     await ctx.send(embed=embed)
 
