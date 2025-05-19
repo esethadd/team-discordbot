@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 from discord import Embed
 from collections import defaultdict, Counter
+import aiohttp
 
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -140,6 +141,105 @@ async def stats(ctx):
 
     embed.add_field(name="📬 Active Subscriptions", value=str(subs), inline=False)
 
+    await ctx.send(embed=embed)
+
+async def search_jobs(keywords, location=None, user_id=None):
+    query = {
+        "keywords": keywords
+    }
+
+    if location:
+        query["location"] = location
+
+    # Apply filters from the user's session
+    filters = user_filters.get(user_id, {})
+    if filters.get("remote") is not None:
+        query["remote"] = filters["remote"]
+    if filters.get("salary"):
+        query["salary_min"], query["salary_max"] = filters["salary"]
+
+    headers = {
+        "Authorization": "Bearer YOUR_API_KEY"  # Replace with your actual auth method
+    }
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(API_URL, params=query, headers=headers) as resp:
+            if resp.status != 200:
+                return []
+            data = await resp.json()
+            return data.get("jobs", [])  # Adapt to your API structure
+
+@bot.command()
+async def find(ctx, *, args):
+    user_id = ctx.author.id
+    if user_id not in user_filters:
+        reset_filters(user_id)
+
+    parts = args.split()
+    if len(parts) < 2:
+        await ctx.send("❌ Please use the format `/find [keywords] [location]`.")
+        return
+
+    keywords = " ".join(parts[:-1])
+    location = parts[-1]
+
+    jobs = await search_jobs(keywords, location, user_id)
+    if not jobs:
+        await ctx.send("🔍 No jobs found for your search.")
+        return
+
+    embed = Embed(title=f"🔎 Results for '{keywords}' in {location}", color=0x1abc9c)
+    for job in jobs[:5]:  # limit to 5 results
+        embed.add_field(
+            name=job["title"],
+            value=f"**Company:** {job['company']}\n**Location:** {job['location']}\n[Apply]({job['link']})",
+            inline=False
+        )
+        bot_stats["total_jobs_found"] += 1
+        bot_stats["keyword_counter"][keywords] += 1
+        bot_stats["industry_counter"][job.get("industry", "Unknown")] += 1
+
+    await ctx.send(embed=embed)
+
+@bot.command()
+async def latest(ctx, industry: str):
+    user_id = ctx.author.id
+    if user_id not in user_filters:
+        reset_filters(user_id)
+
+    jobs = await search_jobs(industry, user_id=user_id)
+    if not jobs:
+        await ctx.send("🆕 No new job postings found in that industry.")
+        return
+
+    embed = Embed(title=f"🆕 Latest jobs in {industry}", color=0xff9800)
+    for job in jobs[:5]:
+        embed.add_field(
+            name=job["title"],
+            value=f"**Company:** {job['company']}\n**Location:** {job['location']}\n[Apply]({job['link']})",
+            inline=False
+        )
+        bot_stats["total_jobs_found"] += 1
+        bot_stats["industry_counter"][industry] += 1
+
+    await ctx.send(embed=embed)
+
+@bot.command()
+async def company(ctx, *, company_name):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f"{API_URL}/company", params={"name": company_name}) as resp:
+            if resp.status != 200:
+                await ctx.send("❌ Couldn't fetch data for that company.")
+                return
+            data = await resp.json()
+
+    embed = Embed(title=f"🏢 {company_name}", color=0x9b59b6)
+    for job in data.get("jobs", [])[:3]:
+        embed.add_field(
+            name=job["title"],
+            value=f"{job['location']}\n[Apply]({job['link']})",
+            inline=False
+        )
     await ctx.send(embed=embed)
 
 
